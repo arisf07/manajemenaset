@@ -1,0 +1,23 @@
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing in..." : "Sign In"}
+              </Button>
+            </form>
+            <div className="mt-6 text-center text-sm text-muted-foreground">
+              <p>Access restricted to authorized administrators only</p>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="mt-8 text-center text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} InventoryPro Management System</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+export default LoginPage;
