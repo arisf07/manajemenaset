@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Inventaris Online - PT Ligar Ekspedisi Berkah Amanah</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .dashboard-card { transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+        .dashboard-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .modal-backdrop, .view-backdrop { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        input[type="file"] { color: transparent; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="main-view">
+        <div class="container mx-auto p-4 md:p-8">
+            <header class="mb-8 flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <img src="https://i.ibb.co/Kc2vTcwM/ptlebah.png" alt="Logo PT Lebah" class="h-16 w-auto">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-gray-900">PT Ligar Ekspedisi Berkah Amanah</h1>
+                        <p class="text-gray-600 mt-1">Sistem Manajemen Inventaris</p>
+                    </div>
+                </div>
+                <div class="mt-4 md:mt-0">
+                    <button id="add-asset-btn" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-200 flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                        Tambah Aset
+                    </button>
+                </div>
+            </header>
+
+            <section id="dashboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                 <div data-status="all" class="dashboard-card bg-white p-6 rounded-xl border border-gray-200 cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium text-gray-500">Total Aset</span>
+                            <span id="total-asset-count" class="text-3xl font-bold text-gray-900">0</span>
+                        </div>
+                        <div class="bg-blue-100 text-blue-600 p-3 rounded-full"><i data-lucide="package" class="w-6 h-6"></i></div>
+                    </div>
+                </div>
+                <div data-status="Baik" class="dashboard-card bg-white p-6 rounded-xl border border-gray-200 cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium text-gray-500">Aset Baik</span>
+                            <span id="good-asset-count" class="text-3xl font-bold text-green-600">0</span>
+                        </div>
+                        <div class="bg-green-100 text-green-600 p-3 rounded-full"><i data-lucide="check-circle" class="w-6 h-6"></i></div>
+                    </div>
+                </div>
+                <div data-status="Rusak" class="dashboard-card bg-white p-6 rounded-xl border border-gray-200 cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium text-gray-500">Aset Rusak</span>
+                            <span id="damaged-asset-count" class="text-3xl font-bold text-red-600">0</span>
+                        </div>
+                        <div class="bg-red-100 text-red-600 p-3 rounded-full"><i data-lucide="x-circle" class="w-6 h-6"></i></div>
+                    </div>
+                </div>
+                 <div data-status="nota" class="dashboard-card bg-white p-6 rounded-xl border border-gray-200 cursor-pointer">
+                    <div class="flex justify-between items-start">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium text-gray-500">Nota Aset</span>
+                            <span id="note-asset-count" class="text-3xl font-bold text-yellow-600">0</span>
+                        </div>
+                        <div class="bg-yellow-100 text-yellow-600 p-3 rounded-full"><i data-lucide="file-text" class="w-6 h-6"></i></div>
+                    </div>
+                </div>
+            </section>
+
+            <main class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                    <div class="relative w-full md:w-1/3">
+                        <input type="text" id="search-input" placeholder="Cari barang inventaris..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                    </div>
+                    <div class="flex gap-2">
+                         <button id="export-pdf-btn" class="bg-red-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition-colors duration-200 flex items-center gap-2">
+                            <i data-lucide="file-type-2" class="w-5 h-5"></i> Export PDF
+                        </button>
+                        <button id="export-csv-btn" class="bg-green-500 text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-green-600 transition-colors duration-200 flex items-center gap-2">
+                            <i data-lucide="sheet" class="w-5 h-5"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="p-4 text-sm font-semibold text-gray-600">ID</th>
+                                <th class="p-4 text-sm font-semibold text-gray-600">Nama Barang</th>
+                                <th class="p-4 text-sm font-semibold text-gray-600">Lokasi</th>
+                                <th class="p-4 text-sm font-semibold text-gray-600">Tahun Pembelian</th>
+                                <th class="p-4 text-sm font-semibold text-gray-600">Kondisi</th>
+                                <th class="p-4 text-sm font-semibold text-gray-600 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body"></tbody>
+                    </table>
+                     <p id="no-data-message" class="text-center py-8 text-gray-500 hidden">Tidak ada data untuk ditampilkan.</p>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <div id="details-view" class="hidden min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8 view-backdrop">
+        <div class="container mx-auto max-w-4xl">
+             <button id="back-to-main-btn" class="mb-6 bg-white border border-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-sm hover:bg-gray-100 transition-colors duration-200 flex items-center gap-2">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                Kembali ke Daftar
+            </button>
+            <div class="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white p-4 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        <i data-lucide="building-2" class="w-5 h-5"></i>
+                        <span class="font-semibold text-lg">Barang milik PT Ligar Ekspedisi Berkah Amanah</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2">
+                    <div class="p-8">
+                        <h2 id="detail-nama" class="text-3xl font-bold text-gray-900 mb-2">Nama Aset</h2>
+                        <p id="detail-id" class="text-sm text-gray-500 mb-6">ID Aset: </p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-500">Lokasi</h3>
+                                <p id="detail-lokasi" class="text-lg font-semibold text-gray-800"></p>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-500">Tahun Pembelian</h3>
+                                <p id="detail-tahun" class="text-lg font-semibold text-gray-800"></p>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium text-gray-500">Kondisi</h3>
+                                <p id="detail-kondisi" class="text-lg font-semibold"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 flex items-center justify-center p-4">
+                        <img id="detail-foto" src="https://placehold.co/600x400/e2e8f0/cbd5e0?text=Foto+Aset" alt="Foto Aset" class="max-w-full max-h-96 object-contain rounded-lg">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="asset-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <h2 id="modal-title" class="text-2xl font-bold mb-4">Tambah Aset Baru</h2>
+            <form id="asset-form">
+                <input type="hidden" id="asset-id">
+                <div class="mb-4">
+                    <label for="nama-barang" class="block text-sm font-medium text-gray-700 mb-1">Nama Barang</label>
+                    <input type="text" id="nama-barang" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Foto Barang</label>
+                     <div class="mt-1 flex items-center gap-4">
+                        <img id="image-preview" src="https://placehold.co/100x100/e2e8f0/cbd5e0?text=Preview" class="w-20 h-20 object-cover rounded-md bg-gray-100">
+                        <label for="foto-barang" class="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 text-center">
+                            <span>Pilih Foto</span>
+                            <input id="foto-barang" name="foto-barang" type="file" class="sr-only" accept="image/*">
+                        </label>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label for="lokasi" class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
+                    <input type="text" id="lokasi" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                </div>
+                <div class="mb-4">
+                    <label for="tahun-pembelian" class="block text-sm font-medium text-gray-700 mb-1">Tahun Pembelian</label>
+                    <input type="number" id="tahun-pembelian" class="w-full px-3 py-2 border border-gray-300 rounded-lg" min="1900" max="2099" required>
+                </div>
+                <div class="mb-6">
+                    <label for="kondisi" class="block text-sm font-medium text-gray-700 mb-1">Kondisi</label>
+                    <select id="kondisi" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white" required>
+                        <option value="Baik">Baik</option>
+                        <option value="Rusak">Rusak</option>
+                        <option value="Perbaikan">Dalam Perbaikan</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" id="cancel-btn" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Batal</button>
+                    <button type="submit" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="qr-code-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4 modal-backdrop">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 text-center">
+            <h2 class="text-2xl font-bold mb-4">QR Code Aset</h2>
+            <div class="flex justify-center items-center my-4">
+                 <div id="qrcode-container" class="p-2 border border-gray-300 rounded-lg inline-block">
+                    <div id="qrcode"></div>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">Scan untuk melihat detail. Download untuk ditempel pada aset.</p>
+            <div class="flex justify-center gap-3">
+                 <button id="download-qr-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center gap-2">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                    Download QR
+                </button>
+                <button id="close-qr-btn" class="bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300">Tutup</button>
+            </div>
+        </div>
+    </div>
+    <div id="filtered-list-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4 modal-backdrop">
+        <div class="bg-gray-100 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b bg-white rounded-t-lg flex justify-between items-center">
+                <h2 id="filtered-list-title" class="text-xl font-bold">Daftar Aset</h2>
+                <button id="close-filtered-list-btn" class="text-gray-500 hover:text-gray-800">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto">
+                 <div id="filtered-list-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- KONFIGURASI FIREBASE ANDA ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyC1-inwpcLY_6lIImbxw1yu8WYxrVaNObM",
+      authDomain: "asetptlebah.firebaseapp.com",
+      projectId: "asetptlebah",
+      storageBucket: "asetptlebah.firebasestorage.app",
+      messagingSenderId: "611410643682",
+      appId: "1:611410643682:web:5f00a967c542fc7023ecbb",
+      measurementId: "G-ET79K7RX8S"
+    };
+
+    // --- Inisialisasi Firebase ---
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const assetsCollection = db.collection("assets");
+
+    // --- KODE FIREBASE (PENGGANTI INDEXEDDB) ---
+
+    async function getAllItems() {
+        const snapshot = await assetsCollection.get();
+        const items = [];
+        snapshot.forEach(doc => {
+            items.push(doc.data());
+        });
+        return items;
+    }
+
+    async function getItem(id) {
+        const docRef = assetsCollection.doc(String(id));
+        const doc = await docRef.get();
+        return doc.exists ? doc.data() : null;
+    }
+    
+    async function addItem(item) {
+        const docRef = assetsCollection.doc(String(item.id));
+        await docRef.set(item);
+    }
+    
+    async function updateItem(item) {
+        const docRef = assetsCollection.doc(String(item.id));
+        await docRef.set(item, { merge: true });
+    }
+    
+    async function deleteItem(id) {
+        const docRef = assetsCollection.doc(String(id));
+        await docRef.delete();
+    }
+
+    // --- KODE APLIKASI ANDA (99% TIDAK BERUBAH) ---
+
+    let currentEditId = null;
+    let newPhotoBase64 = null;
+
+    const mainView = document.getElementById('main-view');
+    const detailsView = document.getElementById('details-view');
+    const tableBody = document.getElementById('inventory-table-body');
+    const noDataMessage = document.getElementById('no-data-message');
+    const searchInput = document.getElementById('search-input');
+    const totalAssetCount = document.getElementById('total-asset-count');
+    const goodAssetCount = document.getElementById('good-asset-count');
+    const damagedAssetCount = document.getElementById('damaged-asset-count');
+    const noteAssetCount = document.getElementById('note-asset-count');
+    const assetModal = document.getElementById('asset-modal');
+    const qrCodeModal = document.getElementById('qr-code-modal');
+    const filteredListModal = document.getElementById('filtered-list-modal');
+    const assetForm = document.getElementById('asset-form');
+    const modalTitle = document.getElementById('modal-title');
+    const assetIdInput = document.getElementById('asset-id');
+    const namaBarangInput = document.getElementById('nama-barang');
+    const lokasiInput = document.getElementById('lokasi');
+    const tahunPembelianInput = document.getElementById('tahun-pembelian');
+    const kondisiInput = document.getElementById('kondisi');
+    const fotoBarangInput = document.getElementById('foto-barang');
+    const imagePreview = document.getElementById('image-preview');
+    const addAssetBtn = document.getElementById('add-asset-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const closeQrBtn = document.getElementById('close-qr-btn');
+    const downloadQrBtn = document.getElementById('download-qr-btn');
+    const closeFilteredListBtn = document.getElementById('close-filtered-list-btn');
+    const exportPdfBtn = document.getElementById('export-pdf-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const backToMainBtn = document.getElementById('back-to-main-btn');
+    
+    async function loadAndRenderData(filterTerm = '') {
+        try {
+            let data = await getAllItems();
+            if (filterTerm) {
+                 data = data.filter(item => 
+                    item.nama.toLowerCase().includes(filterTerm) || 
+                    item.lokasi.toLowerCase().includes(filterTerm) || 
+                    String(item.id).includes(filterTerm)
+                );
+            }
+            renderTable(data);
+            updateDashboard(await getAllItems());
+        } catch (error) {
+            console.error("Failed to load and render data:", error);
+            alert("Gagal memuat data dari database online. Periksa koneksi internet dan konfigurasi Firebase Anda.");
+        }
+    }
+
+    const renderTable = (data) => {
+        tableBody.innerHTML = '';
+        noDataMessage.classList.toggle('hidden', data.length > 0);
+        tableBody.classList.toggle('hidden', data.length === 0);
+
+        data.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = 'border-b border-gray-200 hover:bg-gray-50';
+            const conditionColor = item.kondisi === 'Baik' ? 'text-green-600 bg-green-100' : 
+                                   item.kondisi === 'Rusak' ? 'text-red-600 bg-red-100' : 
+                                   'text-yellow-600 bg-yellow-100';
+            row.innerHTML = `
+                <td class="p-4">${item.id}</td>
+                <td class="p-4 font-medium"><a href="#view=${item.id}" class="text-indigo-600 hover:underline">${item.nama}</a></td>
+                <td class="p-4 text-gray-600">${item.lokasi}</td>
+                <td class="p-4 text-gray-600">${item.tahun}</td>
+                <td class="p-4"><span class="px-2 py-1 text-xs font-semibold rounded-full ${conditionColor}">${item.kondisi}</span></td>
+                <td class="p-4 text-center">
+                    <div class="flex justify-center gap-2">
+                        <button data-id="${item.id}" class="qr-btn text-gray-600 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100" title="Tampilkan QR Code"><i data-lucide="qr-code" class="w-5 h-5"></i></button>
+                        <button data-id="${item.id}" class="edit-btn text-green-600 hover:text-green-800 p-1 rounded-full hover:bg-green-100" title="Edit"><i data-lucide="edit" class="w-5 h-5"></i></button>
+                        <button data-id="${item.id}" class="delete-btn text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100" title="Hapus"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                    </div>
+                </td>`;
+            tableBody.appendChild(row);
+        });
+        lucide.createIcons();
+    };
+    
+    const updateDashboard = (inventoryData) => {
+        totalAssetCount.textContent = inventoryData.length;
+        goodAssetCount.textContent = inventoryData.filter(item => item.kondisi === 'Baik').length;
+        damagedAssetCount.textContent = inventoryData.filter(item => item.kondisi === 'Rusak').length;
+        noteAssetCount.textContent = inventoryData.filter(item => ['Rusak', 'Perbaikan'].includes(item.kondisi)).length;
+    };
+
+    const openModal = (modal) => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+    const closeModal = (modal) => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        const placeholderPhoto = 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=Foto+Aset';
+        let existingPhoto = placeholderPhoto;
+        if(currentEditId) {
+            const existingItem = await getItem(currentEditId);
+            existingPhoto = existingItem.foto;
+        }
+
+        const asset = {
+            id: currentEditId || Date.now(),
+            nama: namaBarangInput.value,
+            lokasi: lokasiInput.value,
+            tahun: parseInt(tahunPembelianInput.value),
+            kondisi: kondisiInput.value,
+            foto: newPhotoBase64 || existingPhoto
+        };
+        
+        try {
+            if (currentEditId) {
+                await updateItem(asset);
+            } else {
+                await addItem(asset);
+            }
+            await loadAndRenderData();
+            closeModal(assetModal);
+        } catch (error) {
+            console.error("Failed to save asset:", error);
+            alert("Gagal menyimpan data aset.");
+        }
+    };
+    
+    const handleShowQrCode = async (id) => {
+        const item = await getItem(id);
+        if (!item) return;
+
+        const url = `${window.location.href.split('#')[0]}#view=${item.id}`;
+        const qrcodeContainer = document.getElementById('qrcode');
+        qrcodeContainer.innerHTML = '';
+        new QRCode(qrcodeContainer, { text: url, width: 180, height: 180 });
+        downloadQrBtn.dataset.assetName = item.nama.replace(/\s+/g, '_');
+        openModal(qrCodeModal);
+    };
+    
+    const handleEdit = async (id) => {
+        const item = await getItem(id);
+        if (!item) return;
+        
+        assetForm.reset();
+        currentEditId = id;
+        newPhotoBase64 = null;
+        modalTitle.textContent = 'Edit Aset';
+        assetIdInput.value = item.id;
+        namaBarangInput.value = item.nama;
+        lokasiInput.value = item.lokasi;
+        tahunPembelianInput.value = item.tahun;
+        kondisiInput.value = item.kondisi;
+        imagePreview.src = item.foto || 'https://placehold.co/100x100/e2e8f0/cbd5e0?text=Preview';
+        openModal(assetModal);
+    };
+
+    const handleDelete = async (id) => {
+        if (confirm('Apakah Anda yakin ingin menghapus aset ini?')) {
+            await deleteItem(id);
+            const currentHash = `#view=${id}`;
+            if(window.location.hash === currentHash) {
+                window.location.hash = ''; 
+            } else {
+                await loadAndRenderData();
+            }
+        }
+    };
+
+    const handleRouteChange = async () => {
+        const hash = window.location.hash;
+
+        if (hash.startsWith('#view=')) {
+            const id = Number(hash.substring(6));
+            const item = await getItem(id);
+            if (item) {
+                document.getElementById('detail-id').textContent = `ID Aset: ${item.id}`;
+                document.getElementById('detail-nama').textContent = item.nama;
+                document.getElementById('detail-lokasi').textContent = item.lokasi;
+                document.getElementById('detail-tahun').textContent = item.tahun;
+                document.getElementById('detail-kondisi').textContent = item.kondisi;
+                document.getElementById('detail-foto').src = item.foto || 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=Foto+Aset';
+                
+                const kondisiEl = document.getElementById('detail-kondisi');
+                kondisiEl.className = 'text-lg font-semibold';
+                if(item.kondisi === 'Baik') kondisiEl.classList.add('text-green-600');
+                else if(item.kondisi === 'Rusak') kondisiEl.classList.add('text-red-600');
+                else kondisiEl.classList.add('text-yellow-600');
+
+                mainView.classList.add('hidden');
+                detailsView.classList.remove('hidden');
+            } else {
+                 window.location.hash = '';
+            }
+        } else {
+            mainView.classList.remove('hidden');
+            detailsView.classList.add('hidden');
+            await loadAndRenderData();
+        }
+    }
+    
+    window.addEventListener('hashchange', handleRouteChange);
+    
+    backToMainBtn.addEventListener('click', () => { window.location.hash = ''; });
+    
+    addAssetBtn.addEventListener('click', () => {
+        assetForm.reset();
+        currentEditId = null; 
+        newPhotoBase64 = null;
+        modalTitle.textContent = 'Tambah Aset Baru'; 
+        imagePreview.src = 'https://placehold.co/100x100/e2e8f0/cbd5e0?text=Preview';
+        openModal(assetModal);
+    });
+
+    cancelBtn.addEventListener('click', () => closeModal(assetModal));
+    closeQrBtn.addEventListener('click', () => closeModal(qrCodeModal));
+    closeFilteredListBtn.addEventListener('click', () => closeModal(filteredListModal));
+
+    [assetModal, qrCodeModal, filteredListModal].forEach(modal => {
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(modal); });
+    });
+
+    assetForm.addEventListener('submit', handleFormSubmit);
+    
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        loadAndRenderData(searchTerm);
+    });
+
+    document.body.addEventListener('click', e => {
+        const qrBtn = e.target.closest('.qr-btn');
+        const editBtn = e.target.closest('.edit-btn');
+        const deleteBtn = e.target.closest('.delete-btn');
+        if (qrBtn) handleShowQrCode(Number(qrBtn.dataset.id));
+        if (editBtn) handleEdit(Number(editBtn.dataset.id));
+        if (deleteBtn) handleDelete(Number(deleteBtn.dataset.id));
+    });
+    
+    downloadQrBtn.addEventListener('click', () => {
+        const qrCanvas = document.querySelector('#qrcode canvas');
+        if (!qrCanvas) return;
+        const link = document.createElement('a');
+        link.download = `QR_${downloadQrBtn.dataset.assetName}.png`;
+        link.href = qrCanvas.toDataURL('image/png');
+        link.click();
+    });
+    
+    fotoBarangInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => { 
+                newPhotoBase64 = event.target.result; 
+                imagePreview.src = newPhotoBase64; 
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    document.getElementById('dashboard').addEventListener('click', async (e) => {
+        const card = e.target.closest('.dashboard-card');
+        if (!card) return;
+        const status = card.dataset.status;
+        const filteredListGrid = document.getElementById('filtered-list-grid');
+        const filteredListTitle = document.getElementById('filtered-list-title');
+        filteredListGrid.innerHTML = '';
+        
+        const inventoryData = await getAllItems();
+        let filteredData, title;
+
+        if (status === 'all') { filteredData = inventoryData; title = 'Semua Aset';} 
+        else if (status === 'nota') { filteredData = inventoryData.filter(item => ['Rusak', 'Perbaikan'].includes(item.kondisi)); title = 'Aset untuk Nota (Rusak/Perbaikan)';} 
+        else { filteredData = inventoryData.filter(item => item.kondisi === status); title = `Aset dengan Kondisi: ${status}`;}
+        
+        filteredListTitle.textContent = `${title} (${filteredData.length})`;
+        
+        if (filteredData.length === 0) {
+            filteredListGrid.innerHTML = `<p class="text-center text-gray-500 col-span-full py-12">Tidak ada aset dalam kategori ini.</p>`;
+        } else {
+            filteredData.forEach(item => {
+                const conditionColor = item.kondisi === 'Baik' ? 'text-green-600 bg-green-100' : 
+                                       item.kondisi === 'Rusak' ? 'text-red-600 bg-red-100' : 
+                                       'text-yellow-600 bg-yellow-100';
+                
+                const assetCard = document.createElement('a');
+                assetCard.href = `#view=${item.id}`;
+                assetCard.className = 'block bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-indigo-500';
+                assetCard.onclick = () => closeModal(filteredListModal);
+                
+                assetCard.innerHTML = `
+                    <img src="${item.foto || 'https://placehold.co/600x400/e2e8f0/cbd5e0?text=Foto+Aset'}" alt="${item.nama}" class="w-full h-32 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-gray-800 truncate">${item.nama}</h3>
+                        <div class="flex items-center text-sm text-gray-500 mt-2">
+                            <i data-lucide="map-pin" class="w-4 h-4 mr-2"></i>
+                            <span>${item.lokasi}</span>
+                        </div>
+                        <div class="mt-3">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${conditionColor}">${item.kondisi}</span>
+                        </div>
+                    </div>`;
+                filteredListGrid.appendChild(assetCard);
+            });
+        }
+        lucide.createIcons();
+        openModal(filteredListModal);
+    });
+    
+    exportPdfBtn.addEventListener('click', async () => {
+        const inventoryData = await getAllItems();
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        doc.text("Laporan Inventaris Aset", 14, 16); doc.setFontSize(10);
+        doc.text(`Tanggal: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
+        const tableData = inventoryData.map(item => [item.id, item.nama, item.lokasi, item.tahun, item.kondisi]);
+        doc.autoTable({ startY: 30, head: [['ID', 'Nama Barang', 'Lokasi', 'Tahun', 'Kondisi']], body: tableData, theme: 'striped', headStyles: { fillColor: [41, 128, 185] }});
+        doc.save('laporan_inventaris.pdf');
+    });
+
+    exportCsvBtn.addEventListener('click', async () => {
+        const inventoryData = await getAllItems();
+        const headers = ['ID', 'Nama Barang', 'Lokasi', 'Tahun Pembelian', 'Kondisi'];
+        const csvContent = [ headers.join(','), ...inventoryData.map(item => [item.id, `"${item.nama.replace(/"/g, '""')}"`, `"${item.lokasi.replace(/"/g, '""')}"`, item.tahun, item.kondisi].join(','))].join('\n');
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.setAttribute('href', URL.createObjectURL(blob)); link.setAttribute('download', 'laporan_inventaris.csv');
+        link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    });
+
+    async function main() {
+        try {
+            await handleRouteChange();
+        } catch(error) {
+            console.error("Initialization failed:", error);
+            document.body.innerHTML = `<div class="p-8 text-center text-red-500">Gagal menginisialisasi aplikasi. Pastikan konfigurasi Firebase Anda benar dan ada koneksi internet.</div>`;
+        }
+    }
+
+    main();
+});
+</script>
+
+</body>
+</html>
